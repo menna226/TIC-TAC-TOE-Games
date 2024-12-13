@@ -9,12 +9,8 @@ using namespace std;
 
 
 class FourByFourBoard: public Board<char>{
-    private:
-    int new_row;
-    int new_column;
-    FourByFourRandomPlayer* random_player;
     public:
-    FourByFourBoard(FourByFourRandomPlayer* player) : random_player(player){
+    FourByFourBoard(){
         rows = 4;
         columns = 4;
         board = new char*[rows];
@@ -49,20 +45,19 @@ class FourByFourBoard: public Board<char>{
     return abs(x1 - x2) + abs(y1 - y2) == 1;
     }
     bool update_board(int x, int y, char symbol) override{
-        if(!isValid(x, y) || board[x][y] != symbol)
-            return false;
-        if(random_player == nullptr){
-            cout << "Enter your move, " << " (row and column): ";
-            cin >> new_row >> new_column;
-            if(!isValid(new_row, new_column) || !areAdjacent(x, y, new_row, new_column) || board[new_row][new_column] != '\0')
-                return false;
-        }
-        else if(random_player != nullptr){
+        if(x == -1 || y== -1) return false;
 
-        }
+        int tx = x&3;
+        int ty = (x>>2)&3;
+        if(board[tx][ty] != symbol) return false;
+
+        int new_row = y&3;
+        int new_column = (y>>2)&3;
+        if(!areAdjacent(tx, ty, new_row, new_column) || board[new_row][new_column] != '\0')
+            return false;
         
-        board[new_row][new_column] = board[x][y];
-        board[x][y] = '\0';
+        board[new_row][new_column] = board[tx][ty];
+        board[tx][ty] = '\0';
         return true;
     }
     void display_board() override{
@@ -110,11 +105,11 @@ class FourByFourBoard: public Board<char>{
     bool game_is_over() override{
         return is_win();
     }
-    vector<pair<int, int>> get_avaliable_positions_for_randomplayer(){
+    vector<pair<int, int>> get_current_positions(char symbol){
         vector<pair<int, int>> positions;
         for(int i = 0; i < rows; i++){
             for(int j = 0; j < columns; j++){
-                if(board[i][j] == random_player->getsymbol()){
+                if(board[i][j] == symbol){
                     positions.push_back({i, j});
                 }
             }
@@ -125,26 +120,53 @@ class FourByFourBoard: public Board<char>{
 
 class FourByFourPlayer : public Player<char>{
     public:
-    int current_row;
-    int current_column;
     FourByFourPlayer(string n, char symbol): Player(n, symbol){}
     void getmove(int& x, int& y) override{
+        int tx, ty, new_row, new_column;
         cout << "Choose the position you want to move " << name << " (row and column): ";
-        cin >> x >> y;
-        
-
+        cin >> tx >> ty;
+        if(tx > 3 || ty > 3){
+            x = -1; 
+            y = -1;
+            return;
+        }
+        x = tx | (ty << 2);
+        cout << "Enter your move, " << " (row and column): ";
+        cin >> new_row >> new_column;
+        if(new_row > 3 || new_column > 3){
+            x = -1; 
+            y = -1;
+            return;
+        }
+        y = new_row | (new_column << 2);
     }
 };
 
 class FourByFourRandomPlayer : public RandomPlayer<char>{
     public:
     FourByFourRandomPlayer(char symbol) : RandomPlayer(symbol){}
+
     void getmove(int& x, int& y) override{
+        int tx, ty, new_row, new_column;
         FourByFourBoard* fourByFourBoard = static_cast<FourByFourBoard*>(boardPtr);
-        vector<pair<int, int>> positions = fourByFourBoard->get_avaliable_positions_for_randomplayer();
-            int randomIndex = rand() % positions.size(); 
-            x = positions[randomIndex].first;  
-            y = positions[randomIndex].second;
+        vector<pair<int, int>> positions = fourByFourBoard->get_current_positions(symbol);
+
+        int randomIndex = rand() % positions.size(); 
+        tx = positions[randomIndex].first;  
+        ty = positions[randomIndex].second;
+        x = tx | (ty << 2);
+
+         vector<pair<int, int>> adjacent_positions;
+        // Check if adjacent positions are valid
+        if (fourByFourBoard->isValid(tx - 1, ty)) adjacent_positions.push_back({tx - 1, ty}); // Up
+        if (fourByFourBoard->isValid(tx + 1, ty)) adjacent_positions.push_back({tx + 1, ty}); // Down
+        if (fourByFourBoard->isValid(tx, ty - 1)) adjacent_positions.push_back({tx, ty - 1}); // Left
+        if (fourByFourBoard->isValid(tx, ty + 1)) adjacent_positions.push_back({tx, ty + 1}); // Right
+
+        int randomAdjacentIndex = rand() % adjacent_positions.size();
+        new_row = adjacent_positions[randomAdjacentIndex].first;
+        new_column = adjacent_positions[randomAdjacentIndex].second;
+        y = new_row | (new_column << 2);
     }
 };
 
@@ -182,7 +204,8 @@ int main(){
             Player<char>* player0 = new FourByFourPlayer(name, symbol);
             Player<char>* player1 = (symbol == 'o') ? new FourByFourRandomPlayer('x') : new FourByFourRandomPlayer('o');
             Player<char>* players[2] = {player0, player1};
-            Board<char>* board = new FourByFourBoard(static_cast<FourByFourRandomPlayer*>(player1));
+            Board<char>* board = new FourByFourBoard();
+            player1->setBoard(board);
             GameManager<char> gameManager(board, players);
             gameManager.run();
             delete player0;
@@ -198,7 +221,7 @@ int main(){
             Player<char>* player0 = new FourByFourPlayer(name0, symbol0);
             Player<char>* player1 = new FourByFourPlayer(name1, symbol1);
             Player<char>* players[2] = {player0, player1};
-            Board<char>* board = new FourByFourBoard(nullptr);
+            Board<char>* board = new FourByFourBoard();
             GameManager<char> gameManager(board, players);
             gameManager.run();
             delete player0;
